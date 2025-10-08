@@ -1,12 +1,8 @@
-# Makefile for HLS Motion Detection Testbench
-# Usage: make [all|clean|run|cosim|synth]
-
-# Configuration
+# Makefile pour Vitis HLS 2020
 PROJECT_NAME = motion_detection
 TB_EXECUTABLE = testbench
 HLS_COMMAND = vitis_hls
 
-# Fichiers sources
 SOURCES = src/motion_detection.cpp \
           src/image_producer.cpp \
           src/frame_differencer.cpp \
@@ -14,84 +10,58 @@ SOURCES = src/motion_detection.cpp \
 
 TESTBENCH = tb/testbench.cpp
 
-# Dossiers
 BUILD_DIR = build
 REPORT_DIR = reports
-DATA_DIR = data
-OUTPUT_DIR = output
 
-# Flags de compilation
 CXX = g++
 CXXFLAGS = -O2 -std=c++11 -I./include -I${XILINX_HLS}/include
 LDFLAGS = -lm
 
 # Cibles principales
-.PHONY: all clean run cosim synth help
+.PHONY: all clean run hls-synth hls-csim hls-cosim
 
 all: $(BUILD_DIR)/$(TB_EXECUTABLE)
 
-# Création des dossiers
-$(BUILD_DIR) $(REPORT_DIR) $(DATA_DIR):
-	@mkdir -p $@
-
-# Compilation du testbench standalone
-$(BUILD_DIR)/$(TB_EXECUTABLE): $(SOURCES) $(TESTBENCH) | $(BUILD_DIR)
-	@echo "Compiling testbench..."
+$(BUILD_DIR)/$(TB_EXECUTABLE): $(SOURCES) $(TESTBENCH)
+	@mkdir -p $(BUILD_DIR)
+	@echo "Compiling software testbench..."
 	$(CXX) $(CXXFLAGS) -o $@ $(SOURCES) $(TESTBENCH) $(LDFLAGS)
-	@echo "Testbench compiled: $@"
 
-# Exécution du testbench
 run: $(BUILD_DIR)/$(TB_EXECUTABLE)
-	@echo "Running testbench..."
-	@cd $(BUILD_DIR) && ./$(TB_EXECUTABLE)
-	@echo "Testbench execution completed."
+	@echo "Running software simulation..."
+	@./$(BUILD_DIR)/$(TB_EXECUTABLE)
 
-# Simulation Cosim avec Vitis HLS
-cosim: | $(BUILD_DIR) $(REPORT_DIR)
-	@echo "Running Co-simulation with Vitis HLS..."
-	$(HLS_COMMAND) -f run_hls.tcl -tclargs cosim
-	@echo "Co-simulation completed."
+# Cibles HLS pour Vitis 2020
+hls-csim:
+	@echo "Running HLS C simulation (Vitis 2020)..."
+	$(HLS_COMMAND) -f run_hls_2020.tcl -tclargs dummy csim_only dummy
 
-# Synthèse HLS
-synth: | $(BUILD_DIR) $(REPORT_DIR)
-	@echo "Running HLS Synthesis..."
-	$(HLS_COMMAND) -f run_hls.tcl -tclargs synth
-	@echo "Synthesis completed."
+hls-synth:
+	$(HLS_COMMAND) -f run_hls_2020.tcl -tclargs dummy synth dummy
 
-deps:
-	@echo "Installing dependencies for image conversion..."
-	sudo apt-get update && sudo apt-get install -y imagemagick
-	@echo "Dependencies installed."
+hls-cosim:
+	@echo "Running HLS Co-simulation (Vitis 2020)..."
+	$(HLS_COMMAND) -f run_hls_2020.tcl -tclargs dummy cosim dummy
 
-view: run
-	@echo "Converting PPM files to PNG..."
-	cd output && convert *.ppm *.png 2>/dev/null || true
-	@echo "Conversion completed. Check output/*.png files"
+hls-clean:
+	@echo "Cleaning HLS project..."
+	rm -rf $(PROJECT_NAME) *.log *.jou
 
-# Nettoyage
-clean:
-	@echo "Cleaning project..."
-	rm -rf $(BUILD_DIR) $(REPORT_DIR) $(DATA_DIR) $(OUTPUT_DIR)
-	rm -rf *.log *.jou vivado_hls.log
-	rm -rf $(PROJECT_NAME)
-	@echo "Clean completed."
+clean: hls-clean
+	rm -rf $(BUILD_DIR) $(REPORT_DIR) output
 
-# Aide
+# Diagnostic
+debug:
+	@echo "=== Vitis HLS 2020 Environment ==="
+	@vitis_hls -version | head -2
+	@echo "XILINX_HLS: ${XILINX_HLS}"
+	@echo "Project files:"
+	@find src tb include -name "*.cpp" -o -name "*.h" 2>/dev/null | sort
+
 help:
-	@echo "Available targets:"
-	@echo "  all     - Compile testbench executable"
-	@echo "  run     - Run testbench simulation"
-	@echo "  cosim   - Run Vitis HLS co-simulation"
-	@echo "  synth   - Run HLS synthesis"
-	@echo "  clean   - Clean all generated files"
-	@echo "  help    - Show this help message"
-
-# Dépendances
-include/top_level.h include/stream_utils.h:
-	@mkdir -p include
-
-src/%.cpp: include/top_level.h
-	@mkdir -p src
-
-tb/%.cpp: include/top_level.h
-	@mkdir -p tb
+	@echo "Targets for Vitis HLS 2020:"
+	@echo "  run         - Run software testbench"
+	@echo "  hls-csim    - HLS C simulation only"
+	@echo "  hls-synth   - HLS synthesis"
+	@echo "  hls-cosim   - HLS co-simulation"
+	@echo "  debug       - Show environment info"
